@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script>
+      const myHeaders = new Headers();
+      myHeaders.append("Content-Type", "application/json");
+      myHeaders.append("KeyId", "019ec11a-6c41-4b39-b3f5-356aa973b474");
+      myHeaders.append("Content-Type", "application/json");
+      const getYesterday = () => {
+        const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC",];
+        const dateObj = new Date();
+        dateObj.setDate(dateObj.getDate() - 1);
+        const year = dateObj.getFullYear().toString().substr(-2);
+        const month = months[dateObj.getMonth()];
+        const day = ("0" + dateObj.getDate()).slice(-2);
+        return day + "-" + month + "-" + year;
+      };
+      const params = JSON.stringify({
+        DATE_START: getYesterday(),
+        DATE_END: getYesterday(),
+      });
+
+      const requestOptions = {
+        method: "POST",
+        headers: myHeaders,
+        body: params,
+        redirect: "follow",
+      };
+      const strstr = (haystack, needle, beforeNeedle) => {
+        let index = haystack.indexOf(needle);
+        if (index === -1) {
+          return false;
+        }
+        if (beforeNeedle) {
+          return haystack.substr(0, index);
+        }
+        return haystack.substr(index);
+      };
+
+      const PointAxisXY = (arr) => {
+        console.log(arr)
+        let dataPoint = [];
+        let elementCounts = {};
+        arr.forEach(function (e) {elementCounts[e] = (elementCounts[e] || 0) + 1;});
+        for (let key in elementCounts) {
+          let AxisXY = {};
+          if (elementCounts[key] > 1) {
+            const t = key.split(" ");
+            AxisXY.label = t[1] + " " + t[2];
+            AxisXY.y = parseInt(elementCounts[key]);
+            dataPoint.push(AxisXY);
+          }
+        }
+        return dataPoint;
+      };
+      const onClick = async (e) => {
+        alert("เบี่ยงเบน " + e.dataPoint.y);
+      };
+      window.onload = function () {
+        fetch("https://tso-data-gw.pttplc.com/api/PMIS/MasterMeter/v1/test",requestOptions
+        ).then((response) => response.text()).then((result) => {
+            let TimeEntryFee = [];
+            let TimeDeviate = [];
+            let TimeDuplicate = [];
+            const jsonArray = JSON.parse(result);
+            const Array = Object.values(jsonArray);
+            Array.forEach((element, index) => {
+              if (strstr(Array[index]["description"], "ค่าไม่เข้า")) {
+                TimeEntryFee.push(Array[index]["update_timestamp"]);
+              }
+              if (strstr(Array[index]["description"], "เบี่ยงเบน")) {
+                TimeDeviate.push(Array[index]["update_timestamp"]);
+              }
+              if (strstr(Array[index]["description"], "ค่าซ้ำกับเมื่อวาน")) {
+                TimeDuplicate.push(Array[index]["update_timestamp"]);
+              }
+            });
+            const chart = new CanvasJS.Chart("chartContainer", {
+              animationEnabled: true,
+              title: {
+                text: getYesterday(),
+              },
+              axisX: {
+                title: "Time",
+              },
+              exportEnabled: true,
+              zoomEnabled: true,
+              toolbar: {
+                itemBackgroundColor: "#d3d3d3", //Change it to "red"
+              },
+              data: [
+                {
+                  type: "area",
+                  fillOpacity: 0.3,
+                  color: "Gold",
+                  cursor: "pointer",
+                  xValueType: "dateTime",
+                  xValueFormatString: "hh:mm TT",
+                  yValueFormatString: "#,##0",
+                  dataPoints: PointAxisXY(TimeEntryFee),
+                },
+                {
+                  type: "line",
+                  color: "red",
+                  click: onClick,
+                  cursor: "pointer",
+                  xValueType: "dateTime",
+                  xValueFormatString: "hh:mm TT",
+                  yValueFormatString: "#,##0",
+                  dataPoints: PointAxisXY(TimeDeviate),
+                },
+                {
+                  type: "line",
+                  color: "DeepSkyBlue",
+                  cursor: "pointer",
+                  xValueType: "dateTime",
+                  xValueFormatString: "hh:mm TT",
+                  yValueFormatString: "#,##0",
+                  dataPoints: PointAxisXY(TimeDuplicate),
+                },
+              ],
+            });
+            chart.render();
+          }).catch((error) => alert('net::ERR_NAME_NOT_RESOLVED'));
+      };
+    </script>
+  </head>
+  <body>
+    <div id="chartContainer" style="height: 550px"></div>
+    <script src="https://cdn.canvasjs.com/canvasjs.min.js"></script>
+  </body>
+</html>
